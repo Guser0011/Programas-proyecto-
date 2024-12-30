@@ -1,0 +1,92 @@
+using System;
+using System.Collections.Generic;
+
+public class SemanticAnalyzer
+{
+    private readonly SymbolTable _symbolTable;
+
+    public SemanticAnalyzer()
+    {
+        _symbolTable = new SymbolTable();
+    }
+
+    public void Analyze(List<Token> tokens)
+    {
+        foreach (var token in tokens)
+        {
+            if (token.Type == TokenType.Keyword && token.Value == "VAR")
+            {
+                // Variable Declaration
+                string varName = GetNextToken(tokens).Value;
+                Expect(tokens, "=");
+                var value = GetNextToken(tokens);
+
+                if (int.TryParse(value.Value, out _))
+                {
+                    _symbolTable.AddSymbol(varName, "Integer", value.Value);
+                }
+                else
+                {
+                    throw new Exception($"Invalid value for variable '{varName}': {value.Value}");
+                }
+            }
+            else if (token.Type == TokenType.Keyword && token.Value == "IF")
+            {
+                // Condition Verification
+                var conditionVar = GetNextToken(tokens);
+                if (!_symbolTable.Exists(conditionVar.Value))
+                {
+                    throw new Exception($"Undeclared variable '{conditionVar.Value}' in condition.");
+                }
+
+                var operatorToken = GetNextToken(tokens);
+                var value = GetNextToken(tokens);
+
+                if (!_symbolTable.GetSymbol(conditionVar.Value).Type.Equals("Integer") || !int.TryParse(value.Value, out _))
+                {
+                    throw new Exception($"Type mismatch in condition: '{conditionVar.Value}' must be an Integer.");
+                }
+            }
+        }
+    }
+
+    private Token GetNextToken(List<Token> tokens)
+    {
+        return tokens.Count > 0 ? tokens[0] : throw new Exception("Unexpected end of tokens.");
+    }
+
+    private void Expect(List<Token> tokens, string expected)
+    {
+        var token = GetNextToken(tokens);
+        if (token.Value != expected)
+        {
+            throw new Exception($"Expected '{expected}', but got '{token.Value}'");
+        }
+    }
+}
+
+public class SymbolTable
+{
+    private readonly Dictionary<string, (string Type, object Value)> _symbols;
+
+    public SymbolTable()
+    {
+        _symbols = new Dictionary<string, (string, object)>();
+    }
+
+    public void AddSymbol(string name, string type, object value = null)
+    {
+        if (!_symbols.ContainsKey(name))
+            _symbols[name] = (type, value);
+    }
+
+    public bool Exists(string name)
+    {
+        return _symbols.ContainsKey(name);
+    }
+
+    public (string Type, object Value) GetSymbol(string name)
+    {
+        return _symbols.TryGetValue(name, out var value) ? value : throw new Exception($"Symbol '{name}' not found");
+    }
+}
