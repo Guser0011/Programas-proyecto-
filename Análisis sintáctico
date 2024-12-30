@@ -1,0 +1,162 @@
+public class Parser
+{
+    private readonly List<Token> _tokens;
+    private int _current = 0;
+
+    public Parser(List<Token> tokens)
+    {
+        _tokens = tokens;
+    }
+
+    private Token CurrentToken => _tokens[_current];
+
+    private Token Advance()
+    {
+        return _tokens[_current++];
+    }
+
+    private bool Match(params string[] expected)
+    {
+        if (_current < _tokens.Count && expected.Contains(CurrentToken.Value))
+        {
+            Advance();
+            return true;
+        }
+        return false;
+    }
+
+    private void Expect(string expected)
+    {
+        if (!Match(expected))
+            throw new Exception($"Expected '{expected}', but got '{CurrentToken.Value}'");
+    }
+
+    public void ParseProgram()
+    {
+        Expect("BEGIN");
+        while (CurrentToken.Value != "END")
+        {
+            ParseStatement();
+        }
+        Expect("END");
+    }
+
+    private void ParseStatement()
+    {
+        if (Match("CHARACTER")) ParseCharacterDecl();
+        else if (Match("IF")) ParseIfStatement();
+        else if (Match("PRINT")) ParsePrintStatement();
+        else if (Match("VAR")) ParseAssignment();
+        else throw new Exception($"Unexpected token: {CurrentToken.Value}");
+    }
+
+    private void ParseCharacterDecl()
+    {
+        ExpectIdentifier(); // CHARACTER name
+        Expect("AT");
+        Expect("(");
+        ExpectNumber();
+        Expect(",");
+        ExpectNumber();
+        Expect(")");
+        Expect(";");
+    }
+
+    private void ParseIfStatement()
+    {
+        ParseCondition();
+        Expect("THEN");
+        while (CurrentToken.Value != "ENDIF" && CurrentToken.Value != "ELSE")
+        {
+            ParseStatement();
+        }
+        if (Match("ELSE"))
+        {
+            while (CurrentToken.Value != "ENDIF")
+            {
+                ParseStatement();
+            }
+        }
+        Expect("ENDIF");
+    }
+
+    private void ParsePrintStatement()
+    {
+        ExpectString();
+        Expect(";");
+    }
+
+    private void ParseAssignment()
+    {
+        ExpectIdentifier();
+        Expect("=");
+        ParseExpression();
+        Expect(";");
+    }
+
+    private void ParseCondition()
+    {
+        ExpectIdentifier();
+        ExpectOperator();
+        ParseExpression();
+    }
+
+    private void ParseExpression()
+    {
+        ParseTerm();
+        while (Match("+", "-"))
+        {
+            ParseTerm();
+        }
+    }
+
+    private void ParseTerm()
+    {
+        ParseFactor();
+        while (Match("*", "/"))
+        {
+            ParseFactor();
+        }
+    }
+
+    private void ParseFactor()
+    {
+        if (Match("("))
+        {
+            ParseExpression();
+            Expect(")");
+        }
+        else if (IsNumber()) Advance();
+        else if (IsIdentifier()) Advance();
+        else throw new Exception($"Unexpected token: {CurrentToken.Value}");
+    }
+
+    private bool IsNumber() => int.TryParse(CurrentToken.Value, out _);
+    private bool IsIdentifier() => Regex.IsMatch(CurrentToken.Value, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
+
+    private void ExpectIdentifier()
+    {
+        if (!IsIdentifier()) throw new Exception($"Expected identifier, but got '{CurrentToken.Value}'");
+        Advance();
+    }
+
+    private void ExpectNumber()
+    {
+        if (!IsNumber()) throw new Exception($"Expected number, but got '{CurrentToken.Value}'");
+        Advance();
+    }
+
+    private void ExpectString()
+    {
+        if (CurrentToken.Type != TokenType.String)
+            throw new Exception($"Expected string, but got '{CurrentToken.Value}'");
+        Advance();
+    }
+
+    private void ExpectOperator()
+    {
+        if (!Regex.IsMatch(CurrentToken.Value, @"(==|!=|>|<|>=|<=)"))
+            throw new Exception($"Expected operator, but got '{CurrentToken.Value}'");
+        Advance();
+    }
+}
